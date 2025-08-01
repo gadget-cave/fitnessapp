@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Membership Management</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* General Body and Container Enhancements */
+        body {
+            font-family: 'Inter', sans-serif; /* A modern, clean font - consider linking from Google Fonts */
+            background-image: linear-gradient(to right bottom, #f0f4f8, #e6e9ed); /* Subtle gradient background */
+            color: #333; /* Darker default text for readability */
+        }
+
+        /* Enhancements for the main app container */
+        #app {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        /* Login Page Specific Styling */
+        #login-container .bg-white {
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+
+        #login-container .bg-white:hover {
+            transform: translateY(-5px); /* Lift card slightly on hover */
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1); /* More pronounced shadow */
+        }
+
+        #login-container img {
+            max-width: 150px; /* Adjust logo size */
+            height: auto;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.1)); /* Subtle shadow for logo */
+        }
+
+        /* Dashboard Header Styling */
+        header {
+            background-color: #ffffff; /* White background for header */
+            border-radius: 0.75rem; /* Rounded corners for header */
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); /* Soft shadow */
+            margin-bottom: 2rem; /* Space below header */
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Add a subtle fade-in animation for elements */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Table Enhancements */
+        .table-container {
+            max-height: 500px; /* Fixed height for table with scrolling */
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch; /* Enable smooth scrolling on iOS */
+        }
+        
+        .table-container th, .table-container td {
+            white-space: nowrap; /* Prevent text wrapping in table cells */
+        }
+        
+        /* Member status pills */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+            padding-top: 0.3em;
+            padding-bottom: 0.3em;
+            border-radius: 9999px; /* Fully rounded pills */
+            font-size: 0.75rem; /* Slightly smaller font for badges */
+            font-weight: 700; /* Bolder text for badges */
+        }
+        
+        /* Expired row styling - keep existing */
+        .expired {
+            background-color: #fee2e2; /* Tailwind red-100 */
+            border-left: 4px solid #ef4444; /* Tailwind red-500 */
+        }
+
+        /* Live Status Cards */
+        #status-cards > div {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        #status-cards > div:hover {
+            transform: translateY(-3px); /* Lift on hover */
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08); /* Subtle shadow on hover */
+        }
+
+        #status-cards .font-bold.text-2xl {
+            font-size: 2.5rem; /* Slightly larger numbers */
+        }
+
+        /* Scrollbar Styling (Webkit - for Chrome, Safari) */
+        ::-webkit-scrollbar {
+            width: 8px; /* Width of the scrollbar */
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; /* Color of the scrollbar track */
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #a8a8a8; /* Color of the scrollbar handle */
+            border-radius: 10px;
+        }
+        
+        /* Modal styling */
+        #confirm-modal {
+            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent overlay */
+        }
+        
+        #confirm-modal .bg-white {
+            animation: modal-fade-in 0.3s ease-out;
+        }
+        
+        @keyframes modal-fade-in {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app" class="container mx-auto px-4">
+        <!-- Login Section -->
+        <div id="login-container" class="flex justify-center items-center h-screen">
+            <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+                <div class="text-center mb-8">
+                    <img src="https://placehold.co/150x150/F87171/FFFFFF?text=Gym+Logo" alt="Gym logo showing dumbbell and fitness text in bold letters" class="mx-auto mb-4" />
+                    <h1 class="text-2xl font-bold text-gray-800">Gym Admin Login</h1>
+                </div>
+                <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"></div>
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="username">Username</label>
+                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="username" type="text" placeholder="Admin Username">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Password</label>
+                        <input class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline" id="password" type="password" placeholder="**************">
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full" type="submit">Sign In</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard-container" class="hidden">
+            <header class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                <h1 class="text-3xl font-bold text-gray-800">Gym Dashboard</h1>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-600 font-medium hidden md:block">Signed in as: Admin</span>
+                    <button id="logout-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline">Logout</button>
+                </div>
+            </header>
+            
+            <main>
+                <!-- Add Member Form -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6 fade-in">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-4">Add New Member</h2>
+                    <form id="member-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="member-name">Member Name</label>
+                                <input class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="member-name" type="text" placeholder="John Doe" required>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="mobile-number">Mobile Number</label>
+                                <input class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="mobile-number" type="tel" placeholder="9876543210" required>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="fee-amount">Membership Fee</label>
+                                <select class="shadow border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="fee-amount" required>
+                                    <option value="" disabled selected>Select Fee</option>
+                                    <option value="500">₹500 (1 Month)</option>
+                                    <option value="1000">₹1000 (2 Months)</option>
+                                    <option value="1200">₹1200 (3 Months)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2" for="start-date">Start Date</label>
+                                <input class="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" id="start-date" type="date" required>
+                            </div>
+                        </div>
+                        <div class="flex justify-end">
+                            <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline" type="submit">Add Member</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Member Table -->
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6 fade-in">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                        <div>
+                            <h2 class="text-xl font-semibold text-gray-800">Members List</h2>
+                            <span class="text-xs text-green-600" id="last-updated"></span>
+                        </div>
+                        <div class="flex flex-col md:flex-row items-center gap-2 w-full md:w-auto">
+                            <input type="text" id="search-input" placeholder="Search members..." class="shadow border rounded-lg w-full md:w-48 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                            <button id="download-pdf-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none focus:shadow-outline w-full md:w-auto">Download PDF</button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobile</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fee</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="members-list" class="divide-y divide-gray-200">
+                                <!-- Member rows will be inserted here by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Live Status Cards -->
+                <div class="bg-white rounded-lg shadow-md p-6 mt-6 text-center fade-in">
+                    <h3 class="text-lg font-semibold mb-4">Live Members Status</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="status-cards">
+                        <!-- Status cards will be inserted here by JavaScript -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center hidden">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+            <h3 class="text-lg font-bold mb-4">Confirm Deletion</h3>
+            <p class="mb-6">Are you sure you want to delete <span id="member-name-to-delete" class="font-semibold"></span>?</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancel-delete-btn" class="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400">Cancel</button>
+                <button id="confirm-delete-btn" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check if service workers are supported and register our service worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
+        }
+        
+        // Firebase configuration - replaced with your actual config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBe_k7RxoQa2g_Vyw3niG_M74pIPw8Mz0U",
+            authDomain: "gym-fees-5dbcf.firebaseapp.com",
+            databaseURL: "https://gym-fees-5dbcf-default-rtdb.firebaseio.com", 
+            projectId: "gym-fees-5dbcf",
+            storageBucket: "gym-fees-5dbcf.firebasestorage.app",
+            messagingSenderId: "423386853721",
+            appId: "1:423386853721:web:fafd195e95e6b1cb091c48"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+
+        // DOM elements
+        const loginContainer = document.getElementById('login-container');
+        const dashboardContainer = document.getElementById('dashboard-container');
+        const loginForm = document.getElementById('login-form');
+        const errorMessage = document.getElementById('error-message');
+        const logoutBtn = document.getElementById('logout-btn');
+        const memberForm = document.getElementById('member-form');
+        const membersList = document.getElementById('members-list');
+        const currentDateDisplay = document.getElementById('current-date');
+        const statusCards = document.getElementById('status-cards'); 
+        const searchInput = document.getElementById('search-input'); // New: Search input
+        const feeAmountSelect = document.getElementById('fee-amount'); // New: Fee select dropdown
+
+        // Confirmation Modal elements
+        const confirmModal = document.getElementById('confirm-modal');
+        const memberNameToDeleteSpan = document.getElementById('member-name-to-delete');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+        let memberKeyToDelete = null; // To store the key of the member being deleted
+        let allMembersData = {}; // New: Cache all members data for search functionality
+
+        // Define membership durations based on fees
+        const membershipDurations = {
+            "500": 30,  // 500 = 30 days
+            "1000": 60, // 1000 = 60 days
+            "1200": 90  // 1200 = 90 days
+        };
+        
+        // --- Login Functionality ---
+        // Clear username and password fields and set default date on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            // Set today's date and default start date after the DOM is loaded
+            const today = new Date();
+            if(currentDateDisplay) currentDateDisplay.textContent = `Today: ${today.toLocaleDateString()}`;
+            setDefaultDate();
+        });
+
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (username === 'admin' && password === '7860') {
+                loginContainer.classList.add('hidden');
+                dashboardContainer.classList.remove('hidden');
+                loadMembers();
+                updateTimestamp(); 
+            } else {
+                errorMessage.textContent = 'Who are you? Unauthorized access attempted.';
+                errorMessage.classList.remove('hidden');
+            }
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            loginContainer.classList.remove('hidden');
+            dashboardContainer.classList.add('hidden');
+            loginForm.reset();
+            errorMessage.classList.add('hidden');
+            // Clear the username and password fields again on logout
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        });
+
+        // Default to today's date in the form
+        function setDefaultDate() {
+            const today = new Date().toISOString().split('T')[0];
+            const startDateInput = document.getElementById('start-date');
+            if (startDateInput) {
+                startDateInput.value = today;
+            }
+        }
+
+        // --- Add New Member ---
+        memberForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('member-name').value;
+            const mobile = document.getElementById('mobile-number').value;
+            const fee = feeAmountSelect.value; // Get fee from select dropdown
+            const startDate = document.getElementById('start-date').value;
+            
+            const startDateObj = new Date(startDate);
+            const durationDays = membershipDurations[fee]; // Get duration based on selected fee
+
+            // Use a custom modal instead of alert
+            if (!durationDays) { // Validate if a fee with a defined duration was selected
+                // This is a placeholder for a custom modal
+                const customAlert = document.createElement('div');
+                customAlert.classList.add('fixed', 'inset-0', 'flex', 'items-center', 'justify-center', 'bg-black', 'bg-opacity-50', 'z-50');
+                customAlert.innerHTML = `
+                    <div class="bg-white p-6 rounded-lg shadow-lg">
+                        <p class="text-lg">Please select a valid membership fee.</p>
+                        <button onclick="this.parentElement.parentElement.remove()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">OK</button>
+                    </div>
+                `;
+                document.body.appendChild(customAlert);
+                return;
+            }
+
+            const endDateObj = new Date(startDateObj);
+            endDateObj.setDate(startDateObj.getDate() + durationDays); // Set end date based on duration
+            
+            const member = {
+                name: name,
+                mobile: mobile,
+                fee: fee,
+                startDate: startDate,
+                endDate: endDateObj.toISOString().split('T')[0],
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            database.ref('members').push(member)
+                .then(() => {
+                    memberForm.reset();
+                    setDefaultDate();
+                    feeAmountSelect.value = ""; // Reset fee selection
+                })
+                .catch(error => {
+                    console.error("Error adding member: ", error);
+                });
+        });
+
+        // --- Live Status Counters ---
+        function updateStatusCounts(membersData) {
+            let activeCount = 0;
+            let expiredCount = 0;
+            let totalIncome = 0; 
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); 
+
+            for (const key in membersData) {
+                const member = membersData[key];
+                const endDate = new Date(member.endDate);
+                endDate.setHours(0, 0, 0, 0); 
+
+                if (today <= endDate) {
+                    activeCount++;
+                    totalIncome += parseFloat(member.fee);
+                } else {
+                    expiredCount++;
+                }
+            }
+
+            statusCards.innerHTML = `
+                <div class="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <div class="text-green-800 font-bold text-2xl">${activeCount}</div>
+                    <div class="text-green-600">Active Members</div>
+                </div>
+                <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                    <div class="text-red-800 font-bold text-2xl">${expiredCount}</div>
+                    <div class="text-red-600">Expired Members</div>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div class="text-blue-800 font-bold text-2xl">${activeCount + expiredCount}</div>
+                    <div class="text-blue-600">Total Members</div>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <div class="text-yellow-800 font-bold text-2xl">₹${totalIncome.toLocaleString()}</div>
+                    <div class="text-yellow-600">Total Active Income</div>
+                </div>
+            `;
+        }
+
+        // --- Load Members from Firebase and Filter for Search ---
+        function loadMembers() {
+            database.ref('members').on('value', (snapshot) => {
+                allMembersData = snapshot.val(); // Cache all members data
+                displayMembers(allMembersData); // Display all members initially
+                updateStatusCounts(allMembersData); // Update status cards
+            });
+        }
+
+        // --- Search Functionality ---
+        searchInput.addEventListener('keyup', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredMembers = {};
+            if (allMembersData) {
+                for (const key in allMembersData) {
+                    const member = allMembersData[key];
+                    if (member.name.toLowerCase().includes(searchTerm) || member.mobile.includes(searchTerm)) {
+                        filteredMembers[key] = member;
+                    }
+                }
+            }
+            displayMembers(filteredMembers);
+        });
+        
+        function displayMembers(members) {
+            membersList.innerHTML = ''; // Clear table
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); 
+
+            if (!members) {
+                membersList.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-gray-500">No members found.</td></tr>`;
+                return;
+            }
+
+            for (const key in members) {
+                const member = members[key];
+                const endDate = new Date(member.endDate);
+                const isExpired = today > endDate;
+                const status = isExpired ? 'Expired' : 'Active';
+                const statusColor = isExpired ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800';
+
+                const row = document.createElement('tr');
+                row.classList.add('bg-white', 'hover:bg-gray-50', 'fade-in');
+                if (isExpired) {
+                    row.classList.add('expired');
+                }
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${member.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${member.mobile}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">₹${member.fee}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${member.startDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${member.endDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="status-pill ${statusColor}">
+                            ${status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button class="text-indigo-600 hover:text-indigo-900 mx-2" onclick="editMember('${key}')">Edit</button>
+                        <button class="text-red-600 hover:text-red-900 mx-2" onclick="showConfirmModal('${key}', '${member.name}')">Delete</button>
+                    </td>
+                `;
+                membersList.appendChild(row);
+            }
+        }
+
+        // --- Edit Member Functionality ---
+        function editMember(key) {
+            // Functionality to be implemented for editing members
+            console.log("Edit member: ", key);
+            // In a real app, this would populate a form for editing
+            // For now, it's a placeholder.
+        }
+
+        // --- Delete Member Modal ---
+        function showConfirmModal(key, name) {
+            memberKeyToDelete = key;
+            memberNameToDeleteSpan.textContent = name;
+            confirmModal.classList.remove('hidden');
+        }
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+        });
+
+        confirmDeleteBtn.addEventListener('click', () => {
+            if (memberKeyToDelete) {
+                database.ref('members/' + memberKeyToDelete).remove()
+                    .then(() => {
+                        memberKeyToDelete = null;
+                        confirmModal.classList.add('hidden');
+                    })
+                    .catch(error => {
+                        console.error("Error removing member: ", error);
+                        confirmModal.classList.add('hidden');
+                    });
+            }
+        });
+
+        // --- PDF Generation ---
+        window.jsPDF = window.jspdf.jsPDF;
+        document.getElementById('download-pdf-btn').addEventListener('click', () => {
+            const doc = new jsPDF();
+            doc.text("Gym Members List", 14, 20);
+
+            // Fetch current members to be displayed in the PDF
+            const tableData = [];
+            const tableHeaders = ['Name', 'Mobile', 'Fee', 'Start Date', 'End Date', 'Status'];
+
+            // Get a snapshot of the current displayed members (filtered or not)
+            const currentMembersSnapshot = {};
+            if (allMembersData) {
+                const searchTerm = searchInput.value.toLowerCase();
+                for (const key in allMembersData) {
+                    const member = allMembersData[key];
+                    if (member.name.toLowerCase().includes(searchTerm) || member.mobile.includes(searchTerm)) {
+                        currentMembersSnapshot[key] = member;
+                    }
+                }
+            }
+            
+            if (currentMembersSnapshot) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); 
+                for (const key in currentMembersSnapshot) {
+                    const member = currentMembersSnapshot[key];
+                    const endDate = new Date(member.endDate);
+                    const status = today > endDate ? 'Expired' : 'Active';
+
+                    tableData.push([
+                        member.name,
+                        member.mobile,
+                        `₹${member.fee}`, // Format fee for PDF
+                        member.startDate,
+                        member.endDate,
+                        status
+                    ]);
+                }
+            }
+            
+            doc.autoTable({
+                head: [tableHeaders],
+                body: tableData,
+                startY: 40,
+                styles: {
+                    fontSize: 9,
+                    cellPadding: 1,
+                    overflow: 'linebreak'
+                },
+                didParseCell: function(data) {
+                    if (data.column.index === 5 && data.cell.raw) { // Status column
+                        const statusText = data.cell.raw; // raw is the actual value from tableData
+                        if (statusText === 'Expired') {
+                            data.cell.styles.textColor = [239, 68, 68]; 
+                        } else if (statusText === 'Active') {
+                            data.cell.styles.textColor = [34, 197, 94]; 
+                        }
+                    }
+                }
+            });
+            
+            doc.save(`gym-members-${new Date().toISOString().slice(0,10)}.pdf`);
+        });
+
+        // Real-time update timestamp
+        function updateTimestamp() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            document.getElementById('last-updated').textContent = `Last updated: ${timeString}`;
+        }
+
+        // --- Initialize and Event Listeners ---
+        setInterval(() => {
+            if (!dashboardContainer.classList.contains('hidden')) { 
+                updateTimestamp();
+            }
+        }, 1000 * 60);
+    </script>
+</body>
+</html>
